@@ -1,0 +1,23 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.nextflow/
+work/
+results/
+
+# Local reference data, input assemblies, and generated analysis results.
+GCF_009914755.1_T2T-CHM13v2.0_genomic.gff.gz
+22q11.2_25-28-41-105-120_HORs.fasta
+cmh005393/
+cmh005393_chr22q.fa
+cmh005393_chr22q_results/
+quad_chr22q.fa
+quad_chr22q_results/
+strand_normalized/
+hor_annotation/
+freeze/
+papers/
+gfalook/
+impg/
+gfas/
+flagger_out/

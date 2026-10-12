@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!main.nf
+!nextflow.config
+!run_chr22q_lcr_analysis.sh
+!prepare_chr22q_haplotypes.py
+!extract_chr22q_protein_coding_genes.py
+!plot_chr22q_full_lcr_layout.R
+!plot_chr22q_full_lcr_gene_layout.R
+!plot_chr22q_lcr_gene_configurations.R
