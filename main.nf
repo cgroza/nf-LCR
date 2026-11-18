@@ -41,6 +41,7 @@ process WFMASH_FAMILY_ALIGNMENT {
     output:
     tuple val(family), path('alignments.paf'), emit: paf
 
+    script:
     """
     wfmash -t 64 -p 95 -Y '#' -S 20k -j 200k --scaffold-out \\
         "${family_fasta}" > alignments.paf
@@ -59,6 +60,7 @@ process QUERY_CHR22Q_INTERVALS {
     output:
     tuple val(family), path('chr22q_intervals.txt'), emit: intervals
 
+    script:
     """
     impg query -a "${paf}" -r "${params.reference_record}" -d 1000000 |
         awk '\$3-\$2 > 100e3 {print \$1":"\$2+1"-"\$3}' > chr22q_intervals.txt
@@ -77,6 +79,7 @@ process EXTRACT_CHR22Q_FASTA {
     output:
     tuple val(family), path('chr22q.fa'), emit: chr22q_fasta
 
+    script:
     """
     samtools faidx "${family_fasta}" -r "${intervals}" > chr22q.raw.fa
     awk -v reference="${params.reference_record}" \\
@@ -102,7 +105,7 @@ process RUN_CHR22Q_LCR_ANALYSIS {
 
     script:
     """
-    "${projectDir}/run_chr22q_lcr_analysis.sh" \\
+    /opt/chr22q/run_chr22q_lcr_analysis.sh \\
         --fasta "${chr22q_fasta}" \\
         --hor-consensuses "${hor_consensuses}" \\
         --annotation "${annotation}" \\

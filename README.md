@@ -29,8 +29,9 @@ identifies chr22q intervals:
 6. Runs `run_chr22q_lcr_analysis.sh` on the extracted FASTA, using the supplied
    HOR consensus FASTA and CHM13 GFF.
 
-The compute environment must make `wfmash`, `impg`, `samtools`, `python3`,
-`minimap2`, `Rscript`, and the R package `ggplot2` available to SLURM jobs.
+The default Nextflow configuration runs every process in
+`cgroza/nf-chr22q:latest` using Docker. Docker must be available on the SLURM
+compute nodes; the image must be pullable there before jobs start.
 
 The sample-sheet `ASSEMBLY` values are paths to individual FASTA files. They
 may be absolute paths or paths relative to the directory from which Nextflow
@@ -80,8 +81,8 @@ scripts; mount input FASTAs, the sample sheet, the HOR consensus FASTA, and
 the CHM13 GFF at runtime.
 
 ```bash
-docker buildx build --platform linux/amd64 --load -t chr22q-lcr .
-docker run --rm -v "$PWD:/work" chr22q-lcr \
+./build.sh
+docker run --rm -v "$PWD:/work" cgroza/nf-chr22q:latest \
   nextflow run /opt/chr22q/main.nf \
   --samplesheet /work/families.csv \
   --chm13_fasta /work/CHM13.fa \
@@ -90,6 +91,14 @@ docker run --rm -v "$PWD:/work" chr22q-lcr \
   --outdir /work/results
 ```
 
-For SLURM execution, build or publish the image where compute nodes can
-access it and run Nextflow on the cluster host with the appropriate container
-configuration for that site.
+`build.sh` creates a temporary PEM bundle from the macOS system keychains and
+passes it only as the BuildKit `mac_ca` secret. TLS verification remains
+enabled; the certificate bundle is removed after the build and is not copied
+into the final image. Pass an alternate image tag as its sole argument:
+
+```bash
+./build.sh cgroza/nf-chr22q:latest
+```
+
+For SLURM execution, run Nextflow on the cluster host and ensure the compute
+nodes can access Docker and pull `cgroza/nf-chr22q:latest`.
