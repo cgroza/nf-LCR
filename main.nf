@@ -4,7 +4,9 @@ params.samplesheet = null
 params.chm13_fasta = null
 params.hor_consensuses = "${projectDir}/22q11.2_25-28-41-105-120_HORs.fasta"
 params.annotation = "${projectDir}/GCF_009914755.1_T2T-CHM13v2.0_genomic.gff.gz"
-params.reference_record = 'CHM13#0#chr22:18000000-23000000'
+params.reference_sequence_id = 'NC_060946.1'
+params.reference_query = 'NC_060946.1:18000000-23000000'
+params.reference_record = 'CHM13#0#chr22:18000001-23000000'
 params.outdir = 'results'
 
 process BUILD_FAMILY_FASTA {
@@ -22,9 +24,12 @@ process BUILD_FAMILY_FASTA {
 
     script:
     def assembly_files = assemblies.collect { "'${it}'" }.join(' ')
+    def reference_stream = chm13_fasta.name.endsWith('.gz') ?
+        "gzip -cd '${chm13_fasta}'" : "cat '${chm13_fasta}'"
 
     """
-    cat "${chm13_fasta}" ${assembly_files} > family.fa
+    ${reference_stream} > family.fa
+    cat ${assembly_files} >> family.fa
     """
 }
 
@@ -62,7 +67,7 @@ process QUERY_CHR22Q_INTERVALS {
 
     script:
     """
-    impg query -a "${paf}" -r "${params.reference_record}" -d 1000000 |
+    impg query -a "${paf}" -r "${params.reference_query}" -d 1000000 |
         awk '\$3-\$2 > 100e3 {print \$1":"\$2+1"-"\$3}' > chr22q_intervals.txt
     """
 }
@@ -82,8 +87,9 @@ process EXTRACT_CHR22Q_FASTA {
     script:
     """
     samtools faidx "${family_fasta}" -r "${intervals}" > chr22q.raw.fa
-    awk -v reference="${params.reference_record}" \\
-        'index(\$0, ">" reference ":") == 1 { print ">" reference; next } { print }' \\
+    awk -v reference_id="${params.reference_sequence_id}" \\
+        -v reference="${params.reference_record}" \\
+        'index(\$0, ">" reference_id ":") == 1 { print ">" reference; next } { print }' \\
         chr22q.raw.fa > chr22q.fa
     """
 }

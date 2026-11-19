@@ -7,8 +7,8 @@ identifies chr22q intervals:
 
 1. Reads a CSV sample sheet with exactly the required `ASSEMBLY,FAMILY`
    columns.
-2. Concatenates all assembly FASTAs from a family, prefixed by the supplied
-   CHM13 FASTA.
+2. Decompresses the supplied full CHM13 genome when gzipped and concatenates
+   it with all assembly FASTAs from a family.
 3. Runs:
 
    ```bash
@@ -20,14 +20,15 @@ identifies chr22q intervals:
 
    ```bash
    impg query -a ALIGNMENTS.paf \
-     -r CHM13#0#chr22:18000000-23000000 -d 1000000 |
+     -r NC_060946.1:18000000-23000000 -d 1000000 |
      awk '$3-$2 > 100e3 {print $1":"$2+1"-"$3}'
    ```
 
 5. Runs `samtools faidx -r` to extract those intervals from the corresponding
    family FASTA into a chr22q-only FASTA.
-6. Runs `run_chr22q_lcr_analysis.sh` on the extracted FASTA, using the supplied
-   HOR consensus FASTA and CHM13 GFF.
+6. Renames the extracted CHM13 chromosome 22 interval to
+   `CHM13#0#chr22:18000001-23000000`, then runs `run_chr22q_lcr_analysis.sh`
+   using the supplied HOR consensus FASTA and CHM13 GFF.
 
 The default Nextflow configuration runs every process in
 `cgroza/nf-chr22q:latest` using Docker. Docker must be available on the SLURM
@@ -47,7 +48,7 @@ ASSEMBLY,FAMILY
 ```bash
 nextflow run main.nf -profile slurm \
   --samplesheet families.csv \
-  --chm13_fasta /path/to/CHM13.fa \
+  --chm13_fasta /path/to/GCF_009914755.1_T2T-CHM13v2.0_genomic.fna.gz \
   --hor_consensuses /path/to/22q11.2_25-28-41-105-120_HORs.fasta \
   --annotation /path/to/GCF_009914755.1_T2T-CHM13v2.0_genomic.gff.gz \
   --outdir results
@@ -61,8 +62,9 @@ Results are published into:
 - `results/chr22q_fastas/FAMILY/chr22q.fa`
 - `results/lcr_analysis/FAMILY/chr22q_lcr_analysis/`
 
-The default query target is `CHM13#0#chr22:18000000-23000000`. Override it
-only when the CHM13 FASTA uses a different record name:
+The default query target is the NCBI RefSeq chromosome 22 record
+`NC_060946.1:18000000-23000000`. The LCR analysis reference record is named
+`CHM13#0#chr22:18000001-23000000`.
 
 ```bash
 --reference_record 'CHM13#0#chr22:18000000-23000000'
