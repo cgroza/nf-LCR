@@ -7,12 +7,13 @@ identifies chr22q intervals:
 
 1. Reads a CSV sample sheet with exactly the required `ASSEMBLY,FAMILY`
    columns.
-2. Decompresses the supplied full CHM13 genome when gzipped and concatenates
-   it with all assembly FASTAs from a family.
+2. Decompresses gzipped CHM13 and assembly FASTAs and concatenates them for
+   each family.
 3. Runs:
 
    ```bash
-   wfmash -t 64 -p 95 -Y '#' -S 20k -j 200k --scaffold-out
+   samtools faidx family.fa
+   wfmash -t 64 -p 95 -Y '#' -S 20k -j 200k --scaffold-out scaffolds.paf family.fa > alignments.paf
    ```
 
    and writes the PAF alignment.
@@ -31,7 +32,7 @@ identifies chr22q intervals:
    using the supplied HOR consensus FASTA and CHM13 GFF.
 
 The default Nextflow configuration runs every process in
-`cgroza/nf-chr22q:latest` using Docker. Docker must be available on the SLURM
+`cgroza/nf-chr22q:wfmash-0.24.2` using Docker. Docker must be available on the SLURM
 compute nodes; the image must be pullable there before jobs start.
 
 The sample-sheet `ASSEMBLY` values are paths to individual FASTA files. They
@@ -58,6 +59,7 @@ Results are published into:
 
 - `results/family_fastas/FAMILY/family.fa`
 - `results/alignments/FAMILY/alignments.paf`
+- `results/alignments/FAMILY/scaffolds.paf`
 - `results/chr22q_intervals/FAMILY/chr22q_intervals.txt`
 - `results/chr22q_fastas/FAMILY/chr22q.fa`
 - `results/lcr_analysis/FAMILY/chr22q_lcr_analysis/`
@@ -76,15 +78,15 @@ CPUs, 16 GB RAM, and 8 hours.
 
 ## Container environment
 
-`Dockerfile` uses Ubuntu and compiles `minimap2`, `samtools`, and IMPG
-(including `wfmash`) from source. It also installs Nextflow, OpenJDK, R, and
-builds `ggplot2` from CRAN source. The image copies only the workflow and
+`Dockerfile` uses Ubuntu and compiles `minimap2`, `samtools`, and `wfmash`
+v0.24.2 from source. It copies IMPG from the digest-pinned earlier image and
+installs Nextflow, OpenJDK, R, and `ggplot2`. The image copies only the workflow and
 scripts; mount input FASTAs, the sample sheet, the HOR consensus FASTA, and
 the CHM13 GFF at runtime.
 
 ```bash
 ./build.sh
-docker run --rm -v "$PWD:/work" cgroza/nf-chr22q:latest \
+docker run --rm -v "$PWD:/work" cgroza/nf-chr22q:wfmash-0.24.2 \
   nextflow run /opt/chr22q/main.nf \
   --samplesheet /work/families.csv \
   --chm13_fasta /work/CHM13.fa \
@@ -99,8 +101,8 @@ enabled; the certificate bundle is removed after the build and is not copied
 into the final image. Pass an alternate image tag as its sole argument:
 
 ```bash
-./build.sh cgroza/nf-chr22q:latest
+./build.sh cgroza/nf-chr22q:wfmash-0.24.2
 ```
 
 For SLURM execution, run Nextflow on the cluster host and ensure the compute
-nodes can access Docker and pull `cgroza/nf-chr22q:latest`.
+nodes can access Docker and pull `cgroza/nf-chr22q:wfmash-0.24.2`.

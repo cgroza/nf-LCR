@@ -1,38 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG IMPG_VERSION=main
-
-FROM rust:1.88-bookworm AS impg-builder
-
-ARG IMPG_VERSION
-
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        cmake \
-        git \
-        libclang-dev \
-        libgsl-dev \
-        libhts-dev \
-        libjemalloc-dev \
-        libssl-dev \
-        pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN --mount=type=secret,id=mac_ca,required=false \
-    if [ -s /run/secrets/mac_ca ]; then \
-        export CARGO_HTTP_CAINFO=/run/secrets/mac_ca GIT_SSL_CAINFO=/run/secrets/mac_ca; \
-    fi \
-    && git clone --depth 1 --branch "${IMPG_VERSION}" --recurse-submodules \
-        https://github.com/pangenome/impg.git /tmp/impg \
-    && cd /tmp/impg \
-    && cargo install --path . --locked \
-    && mkdir -p /opt/impg-libs \
-    && find /tmp/impg/target \
-        -type f \( -name 'libwfa2.so*' -o -name 'libwfa2cpp.so*' \) \
-        -exec cp --archive {} /opt/impg-libs/ \; \
-    && rm -rf /tmp/impg
+FROM cgroza/nf-chr22q@sha256:a2bfa5aa13a27746899722a60d862d2468acf38ff7e873509de1e8bd5a96e1cb AS impg-builder
 
 FROM ubuntu:24.04
 
@@ -41,6 +9,7 @@ ARG MINIMAP2_VERSION=2.31
 ARG HTSLIB_VERSION=1.21
 ARG SAMTOOLS_VERSION=1.21
 ARG NEXTFLOW_VERSION=26.10.0
+ARG WFMASH_VERSION=v0.24.2
 
 ENV NXF_HOME=/opt/nextflow
 
@@ -105,11 +74,23 @@ RUN --mount=type=secret,id=mac_ca,required=false \
     && make install \
     && rm -rf /tmp/samtools
 
-COPY --from=impg-builder /usr/local/cargo/bin/impg /usr/local/bin/impg
-COPY --from=impg-builder /usr/local/cargo/bin/wfmash /usr/local/bin/wfmash
-COPY --from=impg-builder /opt/impg-libs/ /usr/local/lib/
+COPY --from=impg-builder /usr/local/bin/impg /usr/local/bin/impg
+COPY --from=impg-builder /usr/local/lib/libwfa2*.so* /usr/local/lib/
 
 RUN ldconfig
+
+RUN --mount=type=secret,id=mac_ca,required=false \
+    if [ -s /run/secrets/mac_ca ]; then export GIT_SSL_CAINFO=/run/secrets/mac_ca; fi \
+    && git clone --depth 1 --branch "${WFMASH_VERSION}" --recurse-submodules \
+        https://github.com/waveygang/wfmash.git /tmp/wfmash \
+    && cmake -S /tmp/wfmash -B /tmp/wfmash/build -DCMAKE_BUILD_TYPE=Generic -DDISABLE_LTO=ON \
+        -DCMAKE_INSTALL_RPATH=/opt/wfmash/lib -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
+    && cmake --build /tmp/wfmash/build --parallel "$(nproc)" \
+    && install -m 0755 /tmp/wfmash/build/bin/wfmash /usr/local/bin/wfmash \
+    && mkdir -p /opt/wfmash/lib \
+    && cp -a /tmp/wfmash/build/lib/libwflign.so* /tmp/wfmash/build/lib/libwfa2*.so* /opt/wfmash/lib/ \
+    && /usr/local/bin/wfmash --version \
+    && rm -rf /tmp/wfmash
 
 RUN --mount=type=secret,id=mac_ca,required=false \
     if [ -s /run/secrets/mac_ca ]; then export CURL_CA_BUNDLE=/run/secrets/mac_ca; fi \

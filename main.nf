@@ -12,7 +12,7 @@ params.outdir = 'results'
 process BUILD_FAMILY_FASTA {
     tag { family }
 
-    publishDir "${params.outdir}/family_fastas", mode: 'copy', overwrite: false,
+    publishDir "${params.outdir}/family_fastas", mode: 'copy', overwrite: true,
         saveAs: { filename -> "${family}/${filename}" }
 
     input:
@@ -29,7 +29,12 @@ process BUILD_FAMILY_FASTA {
 
     """
     ${reference_stream} > family.fa
-    cat ${assembly_files} >> family.fa
+    for assembly in ${assembly_files}; do
+        case "\$assembly" in
+            *.gz) gzip -cd "\$assembly" ;;
+            *) cat "\$assembly" ;;
+        esac >> family.fa
+    done
     """
 }
 
@@ -37,7 +42,7 @@ process WFMASH_FAMILY_ALIGNMENT {
     tag { family }
     cpus 64
 
-    publishDir "${params.outdir}/alignments", mode: 'copy', overwrite: false,
+    publishDir "${params.outdir}/alignments", mode: 'copy', overwrite: true,
         saveAs: { filename -> "${family}/${filename}" }
 
     input:
@@ -45,10 +50,12 @@ process WFMASH_FAMILY_ALIGNMENT {
 
     output:
     tuple val(family), path('alignments.paf'), emit: paf
+    path 'scaffolds.paf'
 
     script:
     """
-    wfmash -t 64 -p 95 -Y '#' -S 20k -j 200k --scaffold-out \\
+    samtools faidx "${family_fasta}"
+    wfmash -t ${task.cpus} -p 95 -Y '#' -S 20k -j 200k --scaffold-out scaffolds.paf \\
         "${family_fasta}" > alignments.paf
     """
 }
@@ -56,7 +63,7 @@ process WFMASH_FAMILY_ALIGNMENT {
 process QUERY_CHR22Q_INTERVALS {
     tag { family }
 
-    publishDir "${params.outdir}/chr22q_intervals", mode: 'copy', overwrite: false,
+    publishDir "${params.outdir}/chr22q_intervals", mode: 'copy', overwrite: true,
         saveAs: { filename -> "${family}/${filename}" }
 
     input:
@@ -67,15 +74,20 @@ process QUERY_CHR22Q_INTERVALS {
 
     script:
     """
+    set -o pipefail
     impg query -a "${paf}" -r "${params.reference_query}" -d 1000000 |
         awk '\$3-\$2 > 100e3 {print \$1":"\$2+1"-"\$3}' > chr22q_intervals.txt
+    if [ ! -s chr22q_intervals.txt ]; then
+        echo "No chr22q intervals longer than 100 kb found for ${params.reference_query}" >&2
+        exit 1
+    fi
     """
 }
 
 process EXTRACT_CHR22Q_FASTA {
     tag { family }
 
-    publishDir "${params.outdir}/chr22q_fastas", mode: 'copy', overwrite: false,
+    publishDir "${params.outdir}/chr22q_fastas", mode: 'copy', overwrite: true,
         saveAs: { filename -> "${family}/${filename}" }
 
     input:
@@ -98,7 +110,7 @@ process RUN_CHR22Q_LCR_ANALYSIS {
     tag { family }
     cpus 8
 
-    publishDir "${params.outdir}/lcr_analysis", mode: 'copy', overwrite: false,
+    publishDir "${params.outdir}/lcr_analysis", mode: 'copy', overwrite: true,
         saveAs: { filename -> "${family}/${filename}" }
 
     input:
@@ -143,7 +155,7 @@ workflow {
 
     family_fastas = BUILD_FAMILY_FASTA(family_assemblies, chm13_fasta)
     family_alignments = WFMASH_FAMILY_ALIGNMENT(family_fastas)
-    family_intervals = QUERY_CHR22Q_INTERVALS(family_alignments)
+    family_intervals = QUERY_CHR22Q_INTERVALS(family_alignments.paf)
     chr22q_inputs = family_fastas.join(family_intervals)
     chr22q_fastas = EXTRACT_CHR22Q_FASTA(chr22q_inputs)
 

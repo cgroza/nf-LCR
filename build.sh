@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-image_tag="${1:-cgroza/nf-chr22q:latest}"
+image_tag="${1:-cgroza/nf-chr22q:wfmash-0.24.2}"
 ca_bundle="$(mktemp -t nf-chr22q-ca)"
 trap 'rm -f "$ca_bundle"' EXIT
 
